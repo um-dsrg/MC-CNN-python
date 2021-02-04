@@ -4,9 +4,9 @@ import numpy as np
 import cv2
 
 def readPfm(filename):
-    f = open(filename, 'r')
+    f = open(filename, 'rb')
     line = f.readline()
-    assert line.strip() == "Pf" # one sample per pixel
+    #assert line.strip() == "Pf" # one sample per pixel
     line = f.readline()
     items = line.strip().split()
     width = int(items[0])
@@ -55,11 +55,11 @@ def writePfm(disparity_map, filename):
     assert len(disparity_map.shape) == 2
     height, width = disparity_map.shape
     disparity_map = disparity_map.astype(np.float32)
-    o = open(filename, "w")
+    o = open(filename, "wb")
     # header
-    o.write("Pf\n")
-    o.write("{} {}\n".format(width, height))
-    o.write("-1.0\n")
+    o.write(b"Pf\n")
+    o.write("{} {}\n".format(width, height).encode('utf-8'))
+    o.write(b"-1.0\n")
     # raster
     # NOTE: bottom up
     # little-endian
@@ -76,7 +76,7 @@ def saveTimeFile(times, path):
 
 def testMk(dirName):
     if not os.path.isdir(dirName):
-        os.mkdir(dirName)
+        os.makedirs(dirName)
 
 def recurMk(path):
     items = path.split("/")

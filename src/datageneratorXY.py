@@ -5,21 +5,21 @@ import os
 import numpy as np
 import cv2
 import copy
-from LibMccnn.util import readPfm
+from util import readPfm
 import random
 from tensorflow import expand_dims
-#import matplotlib.pyplot as plt
-from skimage.feature import local_binary_pattern
+import matplotlib.pyplot as plt
 
 class ImageDataGenerator:
     """
         input image patch pairs generator
     """
-    def __init__(self, left_image_list, shuffle=False, 
+    def __init__(self, left_image_list_file, shuffle=False, 
                  patch_size=(11, 11),
                  in_left_suffix='im0.png',
                  in_right_suffix='im1.png',
-                 gtX_suffix='disp0GT.pfm',
+                 gtX_suffix='dispX0GT.pfm',
+                 gtY_suffix='dispY0GT.pfm',
                  # tunable hyperparameters
                  # see origin paper for details
                  dataset_neg_low=1.5, dataset_neg_high=6,
@@ -38,15 +38,16 @@ class ImageDataGenerator:
         self.in_left_suffix = in_left_suffix
         self.in_right_suffix = in_right_suffix
         self.gtX_suffix = gtX_suffix
+        self.gtY_suffix = gtY_suffix
         self.dataset_neg_low = dataset_neg_low
         self.dataset_neg_high = dataset_neg_high
         self.dataset_pos = dataset_pos
-        self.nchannels = 1
+
         # the pointer indicates which image are next to be used
         # a mini-batch is fully constructed using one image(pair)
         self.pointer = 0
 
-        self.read_image_list(left_image_list)
+        self.read_image_list(left_image_list_file)
         self.prefetch()
         if self.shuffle:
             self.shuffle_data()
@@ -55,42 +56,25 @@ class ImageDataGenerator:
         """
             form lists of left, right & ground truth paths
         """
-        self.left_paths = []
-        self.right_paths = []
-        self.gtX_paths = []
-        for image in image_list:
-            sl = os.path.join(image,self.in_left_suffix)
-            self.left_paths.append(sl)
-            self.right_paths.append(sl.replace(self.in_left_suffix, self.in_right_suffix))
-            self.gtX_paths.append(sl.replace(self.in_left_suffix, self.gtX_suffix))
-        
-        self.data_size = len(self.left_paths)
-        print("  total image num is {}".format(self.data_size))
-        '''
         with open(image_list) as f:
 
             lines = f.readlines()
             self.left_paths = []
             self.right_paths = []
             self.gtX_paths = []
-            if self.nchannels == 2:
-                self.left_lbp_paths = []
-                self.right_lbp_paths = []
+            self.gtY_paths = []
 
             for l in lines:
                 sl = l.strip()
                 self.left_paths.append(sl)
                 self.right_paths.append(sl.replace(self.in_left_suffix, self.in_right_suffix))
                 self.gtX_paths.append(sl.replace(self.in_left_suffix, self.gtX_suffix))
-                if self.nchannels == 2:
-                    # Get the paths of the lbp files that are pre-computed
-                    self.left_lbp_paths.append(os.path.join(os.path.join('../data/lbp/', os.path.basename(os.path.dirname(sl))), 'lbp-left-%d.npy'%(self.radius)))
-                    self.right_lbp_paths.append(os.path.join(os.path.join('../data/lbp/', os.path.basename(os.path.dirname(sl))), 'lbp-right-%d.npy'%(self.radius)))
+                self.gtY_paths.append(sl.replace(self.in_left_suffix, self.gtY_suffix))
 
             # store total number of data
             self.data_size = len(self.left_paths)
             print("total image num in file {} is {}".format(image_list, self.data_size))
-        '''  
+
     def prefetch(self):
         """
             prefetch all images
@@ -100,10 +84,7 @@ class ImageDataGenerator:
         self.left_images = []
         self.right_images = []
         self.gtX_images = []
-        # Create an empty list of lbps
-        #if self.nchannels == 2:
-        #    self.left_lbps = []
-        #    self.right_lbps = []
+        self.gtY_images = []
 
         for _ in range(self.data_size):
 
@@ -117,78 +98,48 @@ class ImageDataGenerator:
             # as the paper described
             left_image = (left_image - np.mean(left_image, axis=(0, 1))) / np.std(left_image, axis=(0, 1))
             right_image = (right_image - np.mean(right_image, axis=(0, 1))) / np.std(right_image, axis=(0, 1))
-            #if self.nchannels == 2:
-            #    # Load the lbp data
-            #    left_lbp = np.load(self.left_lbp_paths[_]).astype(np.float32)
-            #    right_lbp = np.load(self.right_lbp_paths[_]).astype(np.float32)
-            
-            #    # Normalize using zero mean and unit variance
-            #    left_lbp = (left_lbp - np.mean(left_lbp,axis=(0,1))) / np.std(left_lbp, axis=(0,1))
-            #    right_lbp = (right_lbp - np.mean(right_lbp, axis=(0,1))) / np.std(right_lbp, axis=(0,1)) 
-            
-            # Put the pre-processed images within the lists
+
             self.left_images.append(left_image)
             self.right_images.append(right_image)
             self.gtX_images.append(readPfm(self.gtX_paths[_]))
-            #if self.nchannels == 2:
-            #    self.left_lbps.append(left_lbp)
-            #    self.right_lbps.append(right_lbp)
-                
-        print("  prefetch done")
+            self.gtY_images.append(readPfm(self.gtY_paths[_]))
+
+        print("prefetch done")
 
     def shuffle_data(self):
         """
             Random shuffle the images and labels
         """
-        # Copy the paths
+
         left_paths = copy.deepcopy(self.left_paths)
         right_paths = copy.deepcopy(self.right_paths)
         gtX_paths = copy.deepcopy(self.gtX_paths)
-        #if self.nchannels == 2:
-        #    left_lbp_paths = copy.deepcopy(self.left_lbp_paths)
-        #    right_lbp_paths = copy.deepcopy(self.right_lbp_paths)
-            		
-        # Copy the images
+        gtY_paths = copy.deepcopy(self.gtY_paths)
         left_images = copy.deepcopy(self.left_images)
         right_images = copy.deepcopy(self.right_images)
         gtX_images = copy.deepcopy(self.gtX_images)
-        #if self.nchannels == 2:
-        #    left_lbps = copy.deepcopy(self.left_lbps)
-        #    right_lbps = copy.deepcopy(self.right_lbps)			
-            
-        # Reinitialize the paths  
+        gtY_images = copy.deepcopy(self.gtY_images)
         self.left_paths = []
         self.right_paths = []
         self.gtX_paths = []
-        #if self.nchannels == 2:
-        #    self.left_lbp_paths = []
-        #    self.right_lbp_paths = []
-        # Reinitialize the images    
+        self.gtY_paths = []
         self.left_images = []
         self.right_images = []
         self.gtX_images = []
-        #if self.nchannels == 2:
-        #    self.left_lbps = []
-        #    self.right_lbps = [] 
+        self.gtY_images = []
 
         # create list of permutated index and shuffle data accordingly
         idx = np.random.permutation(self.data_size)
         for i in idx:
-			# Permute the paths
             self.left_paths.append(left_paths[i])
             self.right_paths.append(right_paths[i])
             self.gtX_paths.append(gtX_paths[i])
-            #if self.nchannels == 2:
-            #    self.left_lbp_paths.append(left_lbp_paths[i])
-            #    self.right_lbp_paths.append(right_lbp_paths[i])
-            # Permute the images
+            self.gtY_paths.append(gtY_paths[i])
             self.left_images.append(left_images[i])
             self.right_images.append(right_images[i])
             self.gtX_images.append(gtX_images[i])
-            #if self.nchannels == 2:
-            #    self.left_lbps.append(left_lbps[i])
-            #    self.right_lbps.append(right_lbps[i])
-                
+            self.gtY_images.append(gtY_images[i])
+
     def reset_pointer(self):
         """
             reset pointer to beginning of the list
@@ -215,19 +166,15 @@ class ImageDataGenerator:
         left_path = self.left_paths[self.pointer]
         right_path = self.right_paths[self.pointer]
         gtX_path = self.gtX_paths[self.pointer]
-        #if self.nchannels == 2:
-        #    left_lbp_path = self.left_lbp_paths[self.pointer]
-        #    right_lbp_path = self.right_lbp_paths[self.pointer]
+        gtY_path = self.gtY_paths[self.pointer]
 
         left_image = self.left_images[self.pointer]
         right_image = self.right_images[self.pointer]
         gtX_image = self.gtX_images[self.pointer]
-        #if self.nchannels == 2:
-        #    left_lbp = self.left_lbps[self.pointer]
-        #    right_lbp = self.right_lbps[self.pointer]
-        
+        gtY_image = self.gtY_images[self.pointer]
         assert left_image.shape == right_image.shape
         assert left_image.shape[0:2] == gtX_image.shape
+        assert left_image.shape[0:2] == gtY_image.shape
         height, width = left_image.shape[0:2]
 
         # random choose pixels around which to pick image patchs
@@ -237,7 +184,9 @@ class ImageDataGenerator:
         # rule out those pixels with disparity inf and occlusion
         for _ in range(batch_size):
             while gtX_image[rows[_], cols[_]] == float('inf') or \
-                  int(gtX_image[rows[_], cols[_]]) > cols[_]:
+                  int(gtX_image[rows[_], cols[_]]) > cols[_] or \
+                    gtY_image[rows[_], cols[_]] == float('inf') or \
+                  int(gtY_image[rows[_], cols[_]]) > rows[_]:
                 # random pick another pixel
                 rows[_] = random.randint(0, height-1)
                 cols[_] = random.randint(0, width-1)
@@ -246,39 +195,32 @@ class ImageDataGenerator:
         # this prevents potential indexing error occurring near boundaries
         auged_left_image = np.zeros([height+self.patch_size[0]-1, width+self.patch_size[1]-1, 1], dtype=np.float32)
         auged_right_image = np.zeros([height+self.patch_size[0]-1, width+self.patch_size[1]-1, 1], dtype=np.float32)
-        #if self.nchannels == 2:
-        #    auged_left_lbp = np.zeros([height+self.patch_size[0]-1, width+self.patch_size[1]-1, 1], dtype=np.float32)
-        #    auged_right_lbp = np.zeros([height+self.patch_size[0]-1, width+self.patch_size[1]-1, 1], dtype=np.float32)
 
         # NOTE: patch size should always be odd
-        rows_auged = int((self.patch_size[0] - 1)/2)
-        cols_auged = int((self.patch_size[1] - 1)/2)
+        rows_auged = round((self.patch_size[0] - 1)/2)
+        cols_auged = round((self.patch_size[1] - 1)/2)
         auged_left_image[rows_auged: rows_auged+height, cols_auged: cols_auged+width, 0] = left_image
         auged_right_image[rows_auged: rows_auged+height, cols_auged: cols_auged+width, 0] = right_image
-        #if self.nchannels == 2:
-        #    auged_left_lbp[rows_auged: rows_auged+height, cols_auged: cols_auged+width, 0] = left_lbp
-        #    auged_right_lbp[rows_auged: rows_auged+height, cols_auged: cols_auged+width, 0] = right_lbp
 
         # pick patches
-        patches_left = np.ndarray([batch_size, self.patch_size[0], self.patch_size[1], self.nchannels], dtype=np.float32)
-        patches_right_pos = np.ndarray([batch_size, self.patch_size[0], self.patch_size[1], self.nchannels], dtype=np.float32)
-        patches_right_neg = np.ndarray([batch_size, self.patch_size[0], self.patch_size[1], self.nchannels], dtype=np.float32)
-             			 
+        patches_left = np.ndarray([batch_size, self.patch_size[0], self.patch_size[1], 1], dtype=np.float32)
+        patches_right_pos = np.ndarray([batch_size, self.patch_size[0], self.patch_size[1], 1], dtype=np.float32)
+        patches_right_neg = np.ndarray([batch_size, self.patch_size[0], self.patch_size[1], 1], dtype=np.float32)
+
         for _ in range(batch_size):
             row = rows[_]
             col = cols[_]
-            # Get the left patch
+
             patch_left = auged_left_image[row:row + self.patch_size[0], col:col+self.patch_size[1]]
-            
-            #if self.nchannels == 2:
-            #    patch_lbp_left   = auged_left_lbp[row:row + self.patch_size[0], col:col+self.patch_size[1]]
-            # Put the channels as input for the left network
-            patches_left[_,:,:,0] = patch_left.reshape((self.patch_size[0],self.patch_size[1]))
-            #if self.nchannels == 2:
-            #    patches_left[_,:,:,1] = patch_lbp_left.reshape((self.patch_size[0],self.patch_size[1]))
-            
+            patches_left[_: _+1] = patch_left
+
             right_col = col - int(gtX_image[row, col])
- 
+            right_row = row - int(gtY_image[row, col])
+
+            # For EO training data, there is a difference in accuracy, so there is no need to deviation added
+            pos_col = right_col
+            pos_row = right_row
+            '''
             # postive example
             # small random deviation added
             #pos_col = right_col
@@ -287,15 +229,12 @@ class ImageDataGenerator:
             pos_row = -1
             while pos_col < 0 or pos_col >= width:
                 pos_col = int(right_col + np.random.uniform(-1*self.dataset_pos, self.dataset_pos))
-            # Get the positive right patch
+            while pos_row < 0 or pos_row >= height:
+                pos_row = int(right_row + np.random.uniform(-1*self.dataset_pos, self.dataset_pos))
+            '''
             patch_right_pos = auged_right_image[row:row+self.patch_size[0], pos_col:pos_col+self.patch_size[1]]
-            #if self.nchannels == 2:
-            #    patch_lbp_right_pos = auged_right_lbp[row:row+self.patch_size[0], pos_col:pos_col+self.patch_size[1]]
-            
-            # Put the channels as input for the right positive network
-            patches_right_pos[_,:,:,0] = patch_right_pos.reshape((self.patch_size[0],self.patch_size[1]))
-            #if self.nchannels == 2:
-            #    patches_right_pos[_,:,:,1] = patch_lbp_right_pos.reshape((self.patch_size[0],self.patch_size[1]))
+            patches_right_pos[_: _+1] = patch_right_pos
+
 
             # negative example
             # large random deviation added
@@ -305,16 +244,8 @@ class ImageDataGenerator:
                 if np.random.randint(-1, 1) == -1:
                     neg_dev = -1 * neg_dev
                 neg_col = int(right_col + neg_dev)
-            
-            # Get the negative right patch
             patch_right_neg = auged_right_image[row:row+self.patch_size[0], neg_col:neg_col+self.patch_size[1]]
-            #if self.nchannels == 2:
-            #    patch_lbp_right_neg = auged_right_lbp[row:row+self.patch_size[0], neg_col:neg_col+self.patch_size[1]]
- 
-            # Put the channels as input for the right negative network
-            patches_right_neg[_,:,:,0] = patch_right_neg.reshape((self.patch_size[0],self.patch_size[1]))
-            #if self.nchannels == 2:
-            #    patches_right_neg[_,:,:,1] = patch_lbp_right_neg.reshape((self.patch_size[0],self.patch_size[1]))
+            patches_right_neg[_: _+1] = patch_right_neg
 
             if False:
                 fig = plt.figure()
@@ -335,25 +266,27 @@ class ImageDataGenerator:
         #update pointer
         self.pointer += 1
         return patches_left, patches_right_pos, patches_right_neg
-    
 
     def next_pair(self):
         # Get next images 
         left_path = self.left_paths[self.pointer]
         right_path = self.right_paths[self.pointer]
         gtX_path = self.gtX_paths[self.pointer]
+        gtY_path = self.gtY_paths[self.pointer]
 
         # Read images
         left_image = self.left_images[self.pointer]
         right_image = self.right_images[self.pointer]
         gtX_image = self.gtX_images[self.pointer]
+        gtY_image = self.gtY_images[self.pointer]
         assert left_image.shape == right_image.shape
         assert left_image.shape[0:2] == gtX_image.shape
+        assert left_image.shape[0:2] == gtY_image.shape
 
         #update pointer
         self.pointer += 1
 
-        return left_image, right_image, gtX_image
+        return left_image, right_image, gtX_image, gtY_image
     
     def test_mk(self, path):
         if os.path.exists(path):

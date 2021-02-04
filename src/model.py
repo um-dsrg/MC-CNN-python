@@ -12,7 +12,7 @@ class NET(object):
                weights_path = 'DEFAULT',
                # tunable hyperparameters
                # use suggested values(on Middlebury dataset) of the origin paper as default
-               input_patch_size=11, num_conv_layers=5, num_conv_feature_maps=64, 
+               input_patch_size=11, num_conv_layers=5, num_conv_feature_maps=64,
                conv_kernel_size=3, batch_size = 128):
 
         self.X = x
@@ -21,6 +21,7 @@ class NET(object):
         self.num_conv_layers = num_conv_layers
         self.num_conv_feature_maps = num_conv_feature_maps
         self.conv_kernel_size = conv_kernel_size
+        self.nchannels = 1
 
         if weights_path == 'DEFAULT':      
             self.WEIGHTS_PATH = 'pretrain.npy'
@@ -29,7 +30,7 @@ class NET(object):
 
         # Call the create function to build the computational graph
         self.create()
-    
+
     def create(self):
 
         # input size/size of x:
@@ -37,7 +38,7 @@ class NET(object):
         # [batch_size, h, w, 1] for grayscale image
 
         # input channels: 3 for RGB while 1 for grayscale
-        ic = 1 
+        ic = self.nchannels 
         bs = self.batch_size
         k = self.conv_kernel_size
         nf = self.num_conv_feature_maps
@@ -49,20 +50,20 @@ class NET(object):
         # in the origin MC-CNN, there's no detail about this(maybe I ignored it), but I strongly recommend using "VALID"
 
         self.conv1 = conv(self.X, k, k, ic, nf, 1, 1, padding = "VALID", non_linear = "RELU", name = 'conv1')
-        print "conv1: {}".format(self.conv1.shape)
+        #print("conv1: {}".format(self.conv1.shape))
 
         for _ in range(2, nl):
             setattr(self, "conv{}".format(_), conv(getattr(self, "conv{}".format(_-1)), k, k, nf, nf, 1, 1, \
                     padding = "VALID", non_linear = "RELU", name = 'conv{}'.format(_)))
-            print "conv{}: {}".format(_, getattr(self, "conv{}".format(_)).shape)
+            #print("conv{}: {}".format(_, getattr(self, "conv{}".format(_)).shape))
 
         # last conv without RELU
         setattr(self, "conv{}".format(nl), conv(getattr(self, "conv{}".format(nl-1)), k, k, nf, nf, 1, 1, \
                 padding = "VALID", non_linear = "NONE", name = 'conv{}'.format(nl)))
-        print "conv{}: {}".format(nl, getattr(self, "conv{}".format(nl)).shape)
+        #print("conv{}: {}".format(nl, getattr(self, "conv{}".format(nl)).shape))
 
-        self.features = tf.nn.l2_normalize(getattr(self, "conv{}".format(nl)), dim=-1, name = "normalize")
-        print "features: {}".format(self.features.shape)
+        self.features = tf.nn.l2_normalize(getattr(self, "conv{}".format(nl)), axis=-1, name = "normalize")
+        #print("features: {}".format(self.features.shape))
 
     def load_initial_weights(self, session):
 
@@ -71,7 +72,7 @@ class NET(object):
         weights_dict = np.load(self.WEIGHTS_PATH, encoding = 'bytes').item()
 
         for name in weights_dict:
-            print "restoring var {}...".format(name)
+            print("restoring var {}...".format(name))
             var = [var for var in all_vars if var.name == name][0]
             session.run(var.assign(weights_dict[name]))
      
@@ -82,7 +83,7 @@ class NET(object):
         for var in save_vars:
             weights_dict[var.name] = session.run(var)
         np.save('pretrain.npy', weights_dict) 
-        print "weights saved in file {}".format(file_name)
+        print("weights saved in file {}".format(file_name))
   
 """
 Predefine all necessary layers
@@ -95,10 +96,10 @@ def conv(x, filter_height, filter_width, input_channels, num_filters, stride_y, 
                                        strides = [1, stride_y, stride_x, 1],
                                        padding = padding)
   
-    with tf.variable_scope(name, reuse=tf.AUTO_REUSE) as scope:
+    with tf.compat.v1.variable_scope(name, reuse=tf.compat.v1.AUTO_REUSE) as scope:
         # Create tf variables for the weights and biases of the conv layer
-        weights = tf.get_variable('weights', shape = [filter_height, filter_width, input_channels/groups, num_filters])
-        biases = tf.get_variable('biases', shape = [num_filters])  
+        weights = tf.compat.v1.get_variable('weights', shape = [filter_height, filter_width, input_channels/groups, num_filters],initializer=tf.truncated_normal_initializer(stddev=0.1))
+        biases = tf.compat.v1.get_variable('biases', shape = [num_filters],initializer=tf.constant_initializer(0.0))
     
         if groups == 1:
             conv = convolve(x, weights)
