@@ -13,7 +13,7 @@ class NET(object):
                # tunable hyperparameters
                # use suggested values(on Middlebury dataset) of the origin paper as default
                input_patch_size=11, num_conv_layers=5, num_conv_feature_maps=64,
-               conv_kernel_size=3, batch_size = 128):
+               conv_kernel_size=3, batch_size = 128,nchannels=1):
 
         self.X = x
         self.batch_size = batch_size
@@ -21,7 +21,7 @@ class NET(object):
         self.num_conv_layers = num_conv_layers
         self.num_conv_feature_maps = num_conv_feature_maps
         self.conv_kernel_size = conv_kernel_size
-        self.nchannels = 1
+        self.nchannels = nchannels
 
         if weights_path == 'DEFAULT':      
             self.WEIGHTS_PATH = 'pretrain.npy'
