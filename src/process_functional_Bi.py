@@ -6,8 +6,8 @@ from datetime import datetime
 import numpy as np
 import tensorflow as tf
 
-import libmccnn.util
-from libmccnn.model import NET
+import LibMccnn.util
+from LibMccnn.model import NET
 
 import sys
 from memory_profiler import profile
