@@ -70,36 +70,8 @@ def left_right_consistency(left_disparity_map, right_disparity_map):
     # Derive the disparity map
     disparity_map[mask_valid] = (left_disparity_map[mask_valid] + right_disparity_map_aligned[mask_valid])/2
     
-#def left_right_consistency(left_disparity_map, right_disparity_map):
-    #print("Doing left-right consistency check...")
-    # Derive the width and height of the disparity
-    #height, width = left_disparity_map.shape
-    
-    
-    
-    
-    # Initialize the consistency_map
-    #disparity_map = np.zeros([height, width], dtype=np.float32)
-    
-    '''
-    for h in range(height):
-        for w in range(width):
-			# Get the left disparity pixel and convert it to type int
-            left_disparity = left_disparity_map[h, w]
-                       
-            # disparities that point outside the range
-            if w -int(left_disparity) < 0 or w -int(left_disparity) >= width:
-                disparity_map[h,w] = np.nan
-            else:
-                right_disparity = right_disparity_map[h, w-int(left_disparity)]
-                if abs(left_disparity - right_disparity) <= 1:
-                    # This is a match
-                    disparity_map[h,w] = left_disparity
-                else:
-                    # The rest are marked as occlusion
-                    disparity_map[h,w] = np.nan
-    '''             
     return disparity_map   
+
 def compute_features(left_image, right_image, left_lbp, right_lbp,patch_height, patch_width, checkpoint,nchannels):
 	# Determine the width and height of an image
     height, width = left_image.shape[:2]
@@ -107,12 +79,6 @@ def compute_features(left_image, right_image, left_lbp, right_lbp,patch_height, 
     # pad images to make the final feature map size = (height, width..)
     auged_left_image = np.zeros([1, height+patch_height-1, width+patch_width-1, 1], dtype=np.float32)
     auged_right_image = np.zeros([1, height+patch_height-1, width+patch_width-1, 1], dtype=np.float32)
-    
-    if nchannels == 2:
-		# Initialize the augmented lbp feature
-        auged_left_lbp = np.zeros([1, height+patch_height-1, width+patch_width-1, 1], dtype=np.float32)
-        auged_right_lbp = np.zeros([1, height+patch_height-1, width+patch_width-1, 1], dtype=np.float32)
-     
     
     # derive the top-left corner of the augmented (or padded) left and right images 
     row_start = int((patch_height - 1)/2)
@@ -122,10 +88,6 @@ def compute_features(left_image, right_image, left_lbp, right_lbp,patch_height, 
     auged_left_image[0, row_start: row_start+height, col_start: col_start+width] = left_image
     auged_right_image[0, row_start: row_start+height, col_start: col_start+width] = right_image
     
-    if nchannels == 2:
-        auged_left_lbp[0, row_start: row_start+height, col_start: col_start+width] = left_lbp
-        auged_right_lbp[0, row_start: row_start+height, col_start: col_start+width] = right_lbp	
-
     # TF placeholder for graph input with the same dimensions as the augmented left and right images - to be inputted to the network
     x = tf.compat.v1.placeholder(tf.float32, shape=[1, height+patch_height-1, width+patch_width-1, nchannels])  
 
@@ -143,11 +105,7 @@ def compute_features(left_image, right_image, left_lbp, right_lbp,patch_height, 
     # Put grayscale image in the first channel
     features_left[:,:,:,0] = auged_left_image[:,:,:,0]
     features_right[:,:,:,0] = auged_right_image[:,:,:,0]
-    if nchannels == 2:
-		# Put the lbp features as the second channel
-        features_left[:,:,:,1] = auged_left_lbp[:,:,:,0]
-        features_right[:,:,:,1] = auged_right_lbp[:,:,:,0]
-    # compute features on both images
+
     with tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(
                         log_device_placement=False, \
                         allow_soft_placement=True, \
@@ -160,8 +118,6 @@ def compute_features(left_image, right_image, left_lbp, right_lbp,patch_height, 
         saver.restore(sess, ckpt.model_checkpoint_path)
 
         # Pass the left and right images through the network to extract the features
-        #featuresl = sess.run(features, feed_dict = {x: auged_left_image}) 
-        #featuresr = sess.run(features, feed_dict = {x: auged_right_image})
         featuresl = sess.run(features, feed_dict = {x: features_left})  
         featuresr = sess.run(features, feed_dict = {x: features_right})
         
@@ -169,8 +125,6 @@ def compute_features(left_image, right_image, left_lbp, right_lbp,patch_height, 
         # - before it was [1,height,width,64]
         featuresl = np.squeeze(featuresl, axis=0)
         featuresr = np.squeeze(featuresr, axis=0)
-        
-        #print("{}: features computed done...".format(datetime.now()))
 
     # clear the used gpu memory
     tf.reset_default_graph()
