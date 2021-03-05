@@ -5,7 +5,7 @@ import os
 import numpy as np
 import cv2
 import copy
-from LibMccnn.util import readPfm
+from libmccnn.util import readPfm
 import random
 from tensorflow import expand_dims
 #import matplotlib.pyplot as plt
@@ -15,7 +15,7 @@ class ImageDataGenerator:
     """
         input image patch pairs generator
     """
-    def __init__(self, left_image_list_file, shuffle=False, 
+    def __init__(self, left_image_list_file, radius,shuffle=False, 
                  patch_size=(11, 11),
                  in_left_suffix='im0.png',
                  in_right_suffix='im1.png',
@@ -42,7 +42,7 @@ class ImageDataGenerator:
         self.dataset_neg_high = dataset_neg_high
         self.dataset_pos = dataset_pos
         self.nchannels = nchannels
-        #self.radius = radius
+        self.radius = radius
 
         # the pointer indicates which image are next to be used
         # a mini-batch is fully constructed using one image(pair)
@@ -57,21 +57,29 @@ class ImageDataGenerator:
         """
             form lists of left, right & ground truth paths
         """
-        #with open(image_list) as f:
-        #    print(f)
+        with open(image_list) as f:
 
-        self.left_paths = []
-        self.right_paths = []
-        self.gtX_paths = []
+            lines = f.readlines()
+            self.left_paths = []
+            self.right_paths = []
+            self.gtX_paths = []
+            if self.nchannels == 2:
+                self.left_lbp_paths = []
+                self.right_lbp_paths = []
 
-        for l in image_list:
-            sl = os.path.join(l.strip(),self.in_left_suffix)
-            self.left_paths.append(sl)
-            self.right_paths.append(sl.replace(self.in_left_suffix, self.in_right_suffix))
-            self.gtX_paths.append(sl.replace(self.in_left_suffix, self.gtX_suffix))
-        # store total number of data
-        self.data_size = len(self.left_paths)
-        print("total image num in file is {}".format(self.data_size))
+            for l in lines:
+                sl = l.strip()
+                self.left_paths.append(sl)
+                self.right_paths.append(sl.replace(self.in_left_suffix, self.in_right_suffix))
+                self.gtX_paths.append(sl.replace(self.in_left_suffix, self.gtX_suffix))
+                if self.nchannels == 2:
+                    # Get the paths of the lbp files that are pre-computed
+                    self.left_lbp_paths.append(os.path.join(os.path.join('../data/lbp/', os.path.basename(os.path.dirname(sl))), 'lbp-left-%d.npy'%(self.radius)))
+                    self.right_lbp_paths.append(os.path.join(os.path.join('../data/lbp/', os.path.basename(os.path.dirname(sl))), 'lbp-right-%d.npy'%(self.radius)))
+
+            # store total number of data
+            self.data_size = len(self.left_paths)
+            print("total image num in file {} is {}".format(image_list, self.data_size))
 
     def prefetch(self):
         """
