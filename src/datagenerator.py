@@ -57,29 +57,17 @@ class ImageDataGenerator:
         """
             form lists of left, right & ground truth paths
         """
-        with open(image_list) as f:
-
-            lines = f.readlines()
-            self.left_paths = []
-            self.right_paths = []
-            self.gtX_paths = []
-            if self.nchannels == 2:
-                self.left_lbp_paths = []
-                self.right_lbp_paths = []
-
-            for l in lines:
-                sl = l.strip()
-                self.left_paths.append(sl)
-                self.right_paths.append(sl.replace(self.in_left_suffix, self.in_right_suffix))
-                self.gtX_paths.append(sl.replace(self.in_left_suffix, self.gtX_suffix))
-                if self.nchannels == 2:
-                    # Get the paths of the lbp files that are pre-computed
-                    self.left_lbp_paths.append(os.path.join(os.path.join('../data/lbp/', os.path.basename(os.path.dirname(sl))), 'lbp-left-%d.npy'%(self.radius)))
-                    self.right_lbp_paths.append(os.path.join(os.path.join('../data/lbp/', os.path.basename(os.path.dirname(sl))), 'lbp-right-%d.npy'%(self.radius)))
-
-            # store total number of data
-            self.data_size = len(self.left_paths)
-            print("total image num in file {} is {}".format(image_list, self.data_size))
+        self.left_paths = []
+        self.right_paths = []
+        self.gtX_paths = []
+ 
+        for folder in image_list:
+            self.left_paths.append(os.path.join(folder,'im0.png'))
+            self.right_paths.append(os.path.join(folder,'im1.png'))
+            self.gtX_paths.append(os.path.join(folder,'disp0GT.pfm'))
+        # store total number of data
+        self.data_size = len(self.left_paths)
+        print("total image num in file {} is {}".format(image_list, self.data_size))
 
     def prefetch(self):
         """
