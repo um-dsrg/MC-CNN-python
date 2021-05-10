@@ -48,7 +48,6 @@ class NET(object):
         # use "VALID" padding here(i.e. no zero padding) since the patch size is small(e.g. 11*11) itself, 
         # padded zero may dominant the result
         # in the origin MC-CNN, there's no detail about this(maybe I ignored it), but I strongly recommend using "VALID"
-
         self.conv1 = conv(self.X, k, k, ic, nf, 1, 1, padding = "VALID", non_linear = "RELU", name = 'conv1')
         #print("conv1: {}".format(self.conv1.shape))
 
@@ -67,7 +66,7 @@ class NET(object):
 
     def load_initial_weights(self, session):
 
-        all_vars = tf.trainable_variables()
+        all_vars = tf.compat.v1.trainable_variables()
         # Load the weights into memory
         weights_dict = np.load(self.WEIGHTS_PATH, encoding = 'bytes').item()
 
@@ -78,7 +77,7 @@ class NET(object):
      
     def save_weights(self, session, file_name='pretrain.npy'):
 
-        save_vars = tf.trainable_variables()
+        save_vars = tf.compat.v1.trainable_variables()
         weights_dict = {}
         for var in save_vars:
             weights_dict[var.name] = session.run(var)
@@ -92,14 +91,14 @@ def conv(x, filter_height, filter_width, input_channels, num_filters, stride_y, 
          padding='SAME', non_linear="RELU", groups=1):
 
     # Create lambda function for the convolution
-    convolve = lambda i, k: tf.nn.conv2d(i, k, 
+    convolve = lambda i, k: tf.nn.conv2d(input=i, filters=k, 
                                        strides = [1, stride_y, stride_x, 1],
                                        padding = padding)
   
     with tf.compat.v1.variable_scope(name, reuse=tf.compat.v1.AUTO_REUSE) as scope:
         # Create tf variables for the weights and biases of the conv layer
-        weights = tf.compat.v1.get_variable('weights', shape = [filter_height, filter_width, input_channels/groups, num_filters],initializer=tf.truncated_normal_initializer(stddev=0.1))
-        biases = tf.compat.v1.get_variable('biases', shape = [num_filters],initializer=tf.constant_initializer(0.0))
+        weights = tf.compat.v1.get_variable('weights', shape = [filter_height, filter_width, input_channels/groups, num_filters],initializer=tf.compat.v1.truncated_normal_initializer(stddev=0.1))
+        biases = tf.compat.v1.get_variable('biases', shape = [num_filters],initializer=tf.compat.v1.constant_initializer(0.0))
     
         if groups == 1:
             conv = convolve(x, weights)
@@ -127,14 +126,14 @@ def conv(x, filter_height, filter_width, input_channels, num_filters, stride_y, 
   
 def fc(x, num_in, num_out, name, relu = True):
 
-    with tf.variable_scope(name) as scope:
+    with tf.compat.v1.variable_scope(name) as scope:
 
         # Create tf variables for the weights and biases
-        weights = tf.get_variable('weights', shape=[num_in, num_out], trainable=True)
-        biases = tf.get_variable('biases', [num_out], trainable=True)
+        weights = tf.compat.v1.get_variable('weights', shape=[num_in, num_out], trainable=True)
+        biases = tf.compat.v1.get_variable('biases', [num_out], trainable=True)
 
         # Matrix multiply weights and inputs and add bias
-        act = tf.nn.xw_plus_b(x, weights, biases, name=scope.name)
+        act = tf.compat.v1.nn.xw_plus_b(x, weights, biases, name=scope.name)
     
     if relu == True:
         # Apply ReLu non linearity
@@ -144,5 +143,5 @@ def fc(x, num_in, num_out, name, relu = True):
         return act
 
 if __name__ == "__main__":
-    x = tf.placeholder(tf.float32, [128, 11, 11, 3])
+    x = tf.compat.v1.placeholder(tf.float32, [128, 11, 11, 3])
     net = NET(x)

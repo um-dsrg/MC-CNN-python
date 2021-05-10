@@ -173,7 +173,7 @@ def compute_features(left_image, right_image, left_lbp, right_lbp,patch_height, 
         #print("{}: features computed done...".format(datetime.now()))
 
     # clear the used gpu memory
-    tf.reset_default_graph()
+    tf.compat.v1.reset_default_graph()
 
     return featuresl, featuresr
 
