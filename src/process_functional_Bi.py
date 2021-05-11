@@ -13,6 +13,7 @@ import sys
 from memory_profiler import profile
 from skimage.transform import warp
 from skimage.transform import SimilarityTransform
+from tqdm import tqdm
 
 def disparity_selection(cost_volume, disp_list):
     # We are going to use the subpixel refinement adopted in this paper
@@ -100,7 +101,8 @@ def left_right_consistency(left_disparity_map, right_disparity_map):
                     disparity_map[h,w] = np.nan
     '''             
     return disparity_map   
-def compute_features(left_image, right_image, left_lbp, right_lbp,patch_height, patch_width, checkpoint,nchannels):
+
+def compute_features(left_image, right_image, patch_height, patch_width, checkpoint,nchannels):
 	# Determine the width and height of an image
     height, width = left_image.shape[:2]
     
@@ -189,7 +191,7 @@ def compute_cost_volume(featuresl, featuresr, dmin, dmax):
     # Initialize the cost volume using the right image as reference
     right_cost_volume = np.zeros([ndisp, height, width], dtype=np.float32)
     
-    for i, d in enumerate(range(dmin,dmax+1)):
+    for i, d in enumerate(tqdm(range(dmin,dmax+1))):
         #print("{}: disparity {} index {}...".format(datetime.now(), d,i))
         
         # Print the disparity
