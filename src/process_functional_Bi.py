@@ -42,10 +42,9 @@ def disparity_selection(cost_volume, disp_list):
             else:
                 disparity_map[h,w] = d
             
-            disparity_map[h,w] = d
+            #disparity_map[h,w] = d
 
-    #return disparity_map
-    return -disparity_map
+    return disparity_map
  
 def left_right_consistency(left_disparity_map, right_disparity_map):
     print("Doing left-right consistency check...")
@@ -70,39 +69,10 @@ def left_right_consistency(left_disparity_map, right_disparity_map):
     
     # Derive the disparity map
     disparity_map[mask_valid] = (left_disparity_map[mask_valid] + right_disparity_map_aligned[mask_valid])/2
-    
-#def left_right_consistency(left_disparity_map, right_disparity_map):
-    #print("Doing left-right consistency check...")
-    # Derive the width and height of the disparity
-    #height, width = left_disparity_map.shape
-    
-    
-    
-    
-    # Initialize the consistency_map
-    #disparity_map = np.zeros([height, width], dtype=np.float32)
-    
-    '''
-    for h in range(height):
-        for w in range(width):
-			# Get the left disparity pixel and convert it to type int
-            left_disparity = left_disparity_map[h, w]
-                       
-            # disparities that point outside the range
-            if w -int(left_disparity) < 0 or w -int(left_disparity) >= width:
-                disparity_map[h,w] = np.nan
-            else:
-                right_disparity = right_disparity_map[h, w-int(left_disparity)]
-                if abs(left_disparity - right_disparity) <= 1:
-                    # This is a match
-                    disparity_map[h,w] = left_disparity
-                else:
-                    # The rest are marked as occlusion
-                    disparity_map[h,w] = np.nan
-    '''             
+
     return disparity_map   
 
-def compute_features(left_image, right_image, patch_height, patch_width, checkpoint,nchannels):
+def compute_features(left_image, right_image, left_lbp, right_lbp,patch_height, patch_width, checkpoint,nchannels):
 	# Determine the width and height of an image
     height, width = left_image.shape[:2]
     
@@ -196,22 +166,20 @@ def compute_cost_volume(featuresl, featuresr, dmin, dmax):
         featuresr_d = np.zeros(featuresr.shape)
         featuresl_d = np.zeros(featuresl.shape)
         
-        # Shift the features by d
-        for f in range(featuresl.shape[2]):
-            # Compute the translation of the feature f
-            featuresr_d[:,:,f] = warp(featuresr[:,:,f],SimilarityTransform(translation=(d, 0)))
-            featuresl_d[:,:,f] = warp(featuresl[:,:,f],SimilarityTransform(translation=(-d, 0)))
+        # Shift the features of the right image by d
+        featuresr_d[:,d:width,:] = featuresr[:,0:width-d,:]
+        featuresl_d[:,0:width-d:] = featuresl[:,d:width,:]
 
         # Compute the dot product
         left_cost_volume[i,:,:] = np.sum(np.multiply(featuresl, featuresr_d), axis=2)
         right_cost_volume[i,:,:] = np.sum(np.multiply(featuresr, featuresl_d), axis=2)
-    
-    print("Cost_volumes computed...")
+    print("Cost_volume for right image computed...")
     # convert from matching score to cost
     # match score larger = cost smaller
     left_cost_volume =  -1. * left_cost_volume
     right_cost_volume = -1. * right_cost_volume
     return left_cost_volume, right_cost_volume
+
 
 # disparity prediction
 # simple "Winner-take-All"
