@@ -192,8 +192,6 @@ def compute_cost_volume(featuresl, featuresr, dmin, dmax):
     right_cost_volume = np.zeros([ndisp, height, width], dtype=np.float32)
     
     for i, d in enumerate(tqdm(range(dmin,dmax+1))):
-        #print("{}: disparity {} index {}...".format(datetime.now(), d,i))
-        
         # Print the disparity
         featuresr_d = np.zeros(featuresr.shape)
         featuresl_d = np.zeros(featuresl.shape)
@@ -203,15 +201,12 @@ def compute_cost_volume(featuresl, featuresr, dmin, dmax):
             # Compute the translation of the feature f
             featuresr_d[:,:,f] = warp(featuresr[:,:,f],SimilarityTransform(translation=(d, 0)))
             featuresl_d[:,:,f] = warp(featuresl[:,:,f],SimilarityTransform(translation=(-d, 0)))
-        
-        # Shift the features of the right image by d
-        #featuresr_d[:,np.max([0,d]):np.min([width+d,width]),:] = featuresr[:,np.max([-d,0]):np.min([width,width-d]),:]
-        #featuresl_d[:,np.max([0,d]):np.min([width+d,width]),:] = featuresl[:,np.max([-d,0]):np.min([width,width-d]),:]
 
         # Compute the dot product
         left_cost_volume[i,:,:] = np.sum(np.multiply(featuresl, featuresr_d), axis=2)
         right_cost_volume[i,:,:] = np.sum(np.multiply(featuresr, featuresl_d), axis=2)
-    print("Cost_volume for right image computed...")
+    
+    print("Cost_volumes computed...")
     # convert from matching score to cost
     # match score larger = cost smaller
     left_cost_volume =  -1. * left_cost_volume
