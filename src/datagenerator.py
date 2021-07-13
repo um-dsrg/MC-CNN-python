@@ -5,7 +5,7 @@ import os
 import numpy as np
 import cv2
 import copy
-from libmccnn.util import readPfm
+from LibMccnn.util import readPfm
 import random
 from tensorflow import expand_dims
 #import matplotlib.pyplot as plt
